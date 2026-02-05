@@ -12,12 +12,15 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	DataDir        string `mapstructure:"data_dir"`
-	AutoFetch      bool   `mapstructure:"auto_fetch"`
-	APITimeout     int    `mapstructure:"api_timeout"`
-	MaxCatalogAge  int    `mapstructure:"max_catalog_age"` // in hours, 0 = no auto-refresh
-	TLEEndpoint    string `mapstructure:"tle_endpoint"`
-	SATCATEndpoint string `mapstructure:"satcat_endpoint"`
+	DataDir           string  `mapstructure:"data_dir"`
+	AutoFetch         bool    `mapstructure:"auto_fetch"`
+	APITimeout        int     `mapstructure:"api_timeout"`
+	MaxCatalogAge     int     `mapstructure:"max_catalog_age"` // in hours, 0 = no auto-refresh
+	TLEEndpoint       string  `mapstructure:"tle_endpoint"`
+	SATCATEndpoint    string  `mapstructure:"satcat_endpoint"`
+	ObserverLatitude  float64 `mapstructure:"observer_latitude"`  // in degrees
+	ObserverLongitude float64 `mapstructure:"observer_longitude"` // in degrees
+	ObserverAltitude  float64 `mapstructure:"observer_altitude"`  // in meters above sea level
 }
 
 // InitConfig initializes the configuration using Viper
@@ -44,6 +47,9 @@ func InitConfig() (*Config, error) {
 	viper.SetDefault("max_catalog_age", 24) // 24 hours default
 	viper.SetDefault("tle_endpoint", "https://spacebook.com/api/entity/tle")
 	viper.SetDefault("satcat_endpoint", "https://spacebook.com/api/entity/satcat")
+	viper.SetDefault("observer_latitude", 0.0)   // degrees
+	viper.SetDefault("observer_longitude", 0.0)  // degrees
+	viper.SetDefault("observer_altitude", 0.0)   // meters
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {

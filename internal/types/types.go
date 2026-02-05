@@ -55,26 +55,26 @@ type SATCAT struct {
 
 // Catalog represents the stored satellite catalog data
 type Catalog struct {
-	TLEs      []TLE     `json:"tles"`
-	SATCATs   []SATCAT  `json:"satcats"`
-	FetchedAt time.Time `json:"fetched_at"`
+	Satellites []*Satellite `json:"satellites"`
+	FetchedAt  time.Time    `json:"fetched_at"`
 }
 
 // Satellite represents a merged view of TLE and SATCAT data
 type Satellite struct {
-	NoradID     int
-	Name        string
-	IntlID      string
-	ObjectType  string
-	Owner       string
-	LaunchDate  string
-	DecayDate   string
-	LaunchSite  string
-	Period      float64
-	Inclination float64
-	Apogee      float64
-	Perigee     float64
-	RCSSize     string
-	TLE         *TLE
-	SATCAT      *SATCAT
+	NoradID     int     `json:"noradId"`
+	Name        string  `json:"name"`
+	IntlID      string  `json:"intlId"`
+	ObjectType  string  `json:"objectType"`
+	Owner       string  `json:"owner"`
+	LaunchDate  string  `json:"launchDate"`
+	DecayDate   string  `json:"decayDate"`
+	LaunchSite  string  `json:"launchSite"`
+	Period      float64 `json:"period"`
+	Inclination float64 `json:"inclination"`
+	Apogee      float64 `json:"apogee"`
+	Perigee     float64 `json:"perigee"`
+	RCSSize     string  `json:"rcsSize"`
+	OrbitRegime string  `json:"orbitRegime"` // LEO, MEO, GEO, HEO, or UNKNOWN
+	TLE         *TLE    `json:"tle"`
+	SATCAT      *SATCAT `json:"satcat"`
 }

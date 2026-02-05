@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dzeleniak/icu/internal/client"
+	"github.com/dzeleniak/icu/internal/propagate"
 	"github.com/dzeleniak/icu/internal/storage"
 	"github.com/dzeleniak/icu/internal/types"
 	"github.com/spf13/cobra"
@@ -24,6 +25,77 @@ in ~/.icu/catalog.json for later use.`,
 
 func init() {
 	rootCmd.AddCommand(fetchCmd)
+}
+
+// mergeSatelliteData combines TLE and SATCAT data into Satellite objects
+// Only includes satellites that have TLEs (SATCAT entries without TLEs are ignored)
+func mergeSatelliteData(tles []types.TLE, satcats []types.SATCAT) []*types.Satellite {
+	// Build TLE map by NORAD ID
+	tleMap := make(map[int]*types.TLE)
+	for i := range tles {
+		noradID := tles[i].GetNoradID()
+		if noradID > 0 {
+			tleMap[noradID] = &tles[i]
+		}
+	}
+
+	// Build SATCAT map by NORAD ID
+	satcatMap := make(map[int]*types.SATCAT)
+	for i := range satcats {
+		satcatMap[satcats[i].NoradID] = &satcats[i]
+	}
+
+	// Merge data - start with TLEs (only include satellites with TLEs)
+	satellites := make([]*types.Satellite, 0, len(tleMap))
+
+	for noradID, tle := range tleMap {
+		// Get corresponding SATCAT entry if it exists
+		satcat, hasSatcat := satcatMap[noradID]
+
+		var sat *types.Satellite
+
+		if hasSatcat {
+			// Calculate orbital regime
+			regime := propagate.DetermineOrbitRegime(
+				satcat.Apogee,
+				satcat.Perigee,
+				satcat.Period,
+				satcat.Inclination,
+			)
+
+			sat = &types.Satellite{
+				NoradID:     noradID,
+				Name:        satcat.Name,
+				IntlID:      satcat.IntlID,
+				ObjectType:  satcat.ObjectType,
+				Owner:       satcat.Owner,
+				LaunchDate:  satcat.LaunchDate,
+				DecayDate:   satcat.DecayDate,
+				LaunchSite:  satcat.LaunchSite,
+				Period:      satcat.Period,
+				Inclination: satcat.Inclination,
+				Apogee:      satcat.Apogee,
+				Perigee:     satcat.Perigee,
+				RCSSize:     satcat.RCSSize,
+				OrbitRegime: string(regime),
+				TLE:         tle,
+				SATCAT:      satcat,
+			}
+		} else {
+			// TLE exists but no SATCAT entry - create minimal satellite record
+			sat = &types.Satellite{
+				NoradID:     noradID,
+				Name:        "",
+				OrbitRegime: string(propagate.RegimeUnknown),
+				TLE:         tle,
+				SATCAT:      nil,
+			}
+		}
+
+		satellites = append(satellites, sat)
+	}
+
+	return satellites
 }
 
 func runFetch() {
@@ -49,10 +121,12 @@ func runFetch() {
 		log.Fatalf("Error fetching SATCATs: %v", err)
 	}
 
+	fmt.Println("Merging satellite data...")
+	satellites := mergeSatelliteData(tles, satcats)
+
 	catalog := &types.Catalog{
-		TLEs:      tles,
-		SATCATs:   satcats,
-		FetchedAt: time.Now(),
+		Satellites: satellites,
+		FetchedAt:  time.Now(),
 	}
 
 	if err := store.Save(catalog); err != nil {
@@ -62,6 +136,6 @@ func runFetch() {
 	fmt.Println("\n✓ Data fetched successfully")
 	fmt.Printf("  TLE entities: %d\n", len(tles))
 	fmt.Printf("  SATCAT entities: %d\n", len(satcats))
-	fmt.Printf("  Total entities: %d\n", len(tles)+len(satcats))
+	fmt.Printf("  Merged satellites (with TLEs): %d\n", len(satellites))
 	fmt.Printf("\nCatalog saved to %s/catalog.json\n", config.DataDir)
 }

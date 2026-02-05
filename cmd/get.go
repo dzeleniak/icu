@@ -51,13 +51,8 @@ func runGet() {
 		return
 	}
 
-	// Build lookup maps
-	tleMap := buildTLEMap(catalog.TLEs)
-	satcatMap := buildSATCATMap(catalog.SATCATs)
-
-	// Merge and filter satellites
-	satellites := mergeSatellites(tleMap, satcatMap)
-	filtered := filterSatellites(satellites, noradID, satName)
+	// Filter satellites
+	filtered := filterSatellites(catalog.Satellites, noradID, satName)
 
 	if len(filtered) == 0 {
 		fmt.Println("No satellites found matching the criteria.")
@@ -70,61 +65,6 @@ func runGet() {
 	} else {
 		displayTLEWithName(filtered)
 	}
-}
-
-// buildTLEMap creates a map of NORAD ID to TLE
-func buildTLEMap(tles []types.TLE) map[int]*types.TLE {
-	tleMap := make(map[int]*types.TLE)
-	for i := range tles {
-		noradID := tles[i].GetNoradID()
-		if noradID > 0 {
-			tleMap[noradID] = &tles[i]
-		}
-	}
-	return tleMap
-}
-
-// buildSATCATMap creates a map of NORAD ID to SATCAT
-func buildSATCATMap(satcats []types.SATCAT) map[int]*types.SATCAT {
-	satcatMap := make(map[int]*types.SATCAT)
-	for i := range satcats {
-		satcatMap[satcats[i].NoradID] = &satcats[i]
-	}
-	return satcatMap
-}
-
-// mergeSatellites combines TLE and SATCAT data into Satellite objects
-func mergeSatellites(tleMap map[int]*types.TLE, satcatMap map[int]*types.SATCAT) []*types.Satellite {
-	satellites := make([]*types.Satellite, 0)
-
-	// Start with SATCAT entries as they have the most metadata
-	for noradID, satcat := range satcatMap {
-		sat := &types.Satellite{
-			NoradID:     noradID,
-			Name:        satcat.Name,
-			IntlID:      satcat.IntlID,
-			ObjectType:  satcat.ObjectType,
-			Owner:       satcat.Owner,
-			LaunchDate:  satcat.LaunchDate,
-			DecayDate:   satcat.DecayDate,
-			LaunchSite:  satcat.LaunchSite,
-			Period:      satcat.Period,
-			Inclination: satcat.Inclination,
-			Apogee:      satcat.Apogee,
-			Perigee:     satcat.Perigee,
-			RCSSize:     satcat.RCSSize,
-			SATCAT:      satcat,
-		}
-
-		// Add TLE if available
-		if tle, ok := tleMap[noradID]; ok {
-			sat.TLE = tle
-		}
-
-		satellites = append(satellites, sat)
-	}
-
-	return satellites
 }
 
 // filterSatellites filters satellites based on NORAD ID and/or name
@@ -176,6 +116,7 @@ func displaySatellites(satellites []*types.Satellite) {
 		fmt.Printf("International:  %s\n", sat.IntlID)
 		fmt.Printf("Type:           %s\n", sat.ObjectType)
 		fmt.Printf("Owner:          %s\n", sat.Owner)
+		fmt.Printf("Orbit Regime:   %s\n", sat.OrbitRegime)
 		fmt.Printf("Launch Date:    %s\n", sat.LaunchDate)
 
 		if sat.DecayDate != "" {

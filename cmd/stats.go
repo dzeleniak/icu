@@ -63,9 +63,7 @@ func runStats() {
 	// Display statistics
 	fmt.Println("Catalog Statistics")
 	fmt.Println("==================")
-	fmt.Printf("TLE entities:    %d\n", len(catalog.TLEs))
-	fmt.Printf("SATCAT entities: %d\n", len(catalog.SATCATs))
-	fmt.Printf("Total entities:  %d\n", len(catalog.TLEs)+len(catalog.SATCATs))
+	fmt.Printf("Satellites:      %d\n", len(catalog.Satellites))
 	fmt.Printf("Last fetched:    %s\n", catalog.FetchedAt.Format("2006-01-02 15:04:05 MST"))
 
 	// Show catalog age and staleness info

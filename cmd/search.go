@@ -14,6 +14,7 @@ var (
 	searchName    string
 	searchOwner   string
 	searchType    string
+	searchRegime  string
 	searchLimit   int
 	searchVerbose bool
 )
@@ -33,6 +34,7 @@ func init() {
 	searchCmd.Flags().StringVarP(&searchName, "name", "n", "", "Search by satellite name (partial match, case-insensitive)")
 	searchCmd.Flags().StringVarP(&searchOwner, "owner", "o", "", "Filter by owner/country code")
 	searchCmd.Flags().StringVarP(&searchType, "type", "t", "", "Filter by object type (PAYLOAD, ROCKET BODY, DEBRIS)")
+	searchCmd.Flags().StringVarP(&searchRegime, "regime", "r", "", "Filter by orbital regime (LEO, MEO, GEO, HEO)")
 	searchCmd.Flags().IntVarP(&searchLimit, "limit", "l", 0, "Maximum number of results to display (0 = no limit)")
 	searchCmd.Flags().BoolVarP(&searchVerbose, "verbose", "v", false, "Display verbose satellite information")
 }
@@ -54,8 +56,8 @@ func runSearch() {
 		return
 	}
 
-	// Search SATCAT entries
-	results := searchSATCAT(catalog.SATCATs, searchName, searchOwner, searchType)
+	// Search satellites
+	results := searchSatellites(catalog.Satellites, searchName, searchOwner, searchType, searchRegime)
 
 	if len(results) == 0 {
 		fmt.Println("No satellites found matching the criteria.")
@@ -69,60 +71,14 @@ func runSearch() {
 	}
 
 	if searchVerbose {
-		// Build TLE map for merging
-		tleMap := buildTLEMap(catalog.TLEs)
-
-		// Convert SATCAT results to Satellite objects with merged TLE data
-		satellites := make([]*types.Satellite, displayCount)
-		for i := 0; i < displayCount; i++ {
-			sat := &types.SATCAT{
-				ID:          results[i].ID,
-				IntlID:      results[i].IntlID,
-				Name:        results[i].Name,
-				NoradID:     results[i].NoradID,
-				LaunchDate:  results[i].LaunchDate,
-				DecayDate:   results[i].DecayDate,
-				ObjectType:  results[i].ObjectType,
-				Owner:       results[i].Owner,
-				LaunchSite:  results[i].LaunchSite,
-				Period:      results[i].Period,
-				Inclination: results[i].Inclination,
-				Apogee:      results[i].Apogee,
-				Perigee:     results[i].Perigee,
-				RCSSize:     results[i].RCSSize,
-			}
-
-			satellites[i] = &types.Satellite{
-				NoradID:     sat.NoradID,
-				Name:        sat.Name,
-				IntlID:      sat.IntlID,
-				ObjectType:  sat.ObjectType,
-				Owner:       sat.Owner,
-				LaunchDate:  sat.LaunchDate,
-				DecayDate:   sat.DecayDate,
-				LaunchSite:  sat.LaunchSite,
-				Period:      sat.Period,
-				Inclination: sat.Inclination,
-				Apogee:      sat.Apogee,
-				Perigee:     sat.Perigee,
-				RCSSize:     sat.RCSSize,
-				SATCAT:      sat,
-			}
-
-			// Add TLE if available
-			if tle, ok := tleMap[sat.NoradID]; ok {
-				satellites[i].TLE = tle
-			}
-		}
-
+		// Display verbose output
 		fmt.Printf("Found %d satellites", len(results))
 		if searchLimit > 0 && len(results) > searchLimit {
 			fmt.Printf(" (showing first %d)", searchLimit)
 		}
 		fmt.Println("\n")
 
-		// Display verbose output
-		displaySatellites(satellites)
+		displaySatellites(results[:displayCount])
 
 		if searchLimit > 0 && len(results) > searchLimit {
 			fmt.Printf("\n... %d more results. Use --limit to show more.\n", len(results)-searchLimit)
@@ -146,14 +102,15 @@ func runSearch() {
 	}
 }
 
-func searchSATCAT(satcats []types.SATCAT, name, owner, objType string) []types.SATCAT {
-	results := make([]types.SATCAT, 0)
+func searchSatellites(satellites []*types.Satellite, name, owner, objType, regime string) []*types.Satellite {
+	results := make([]*types.Satellite, 0)
 
 	nameLower := strings.ToLower(name)
 	ownerUpper := strings.ToUpper(owner)
 	typeLower := strings.ToLower(objType)
+	regimeUpper := strings.ToUpper(regime)
 
-	for _, sat := range satcats {
+	for _, sat := range satellites {
 		// Filter by name (partial match)
 		if name != "" && !strings.Contains(strings.ToLower(sat.Name), nameLower) {
 			continue
@@ -166,6 +123,11 @@ func searchSATCAT(satcats []types.SATCAT, name, owner, objType string) []types.S
 
 		// Filter by type (partial match)
 		if objType != "" && !strings.Contains(strings.ToLower(sat.ObjectType), typeLower) {
+			continue
+		}
+
+		// Filter by orbital regime
+		if regime != "" && strings.ToUpper(sat.OrbitRegime) != regimeUpper {
 			continue
 		}
 
