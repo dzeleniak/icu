@@ -1,4 +1,4 @@
-# ICU - International Catalog Utility
+# ICU - Internal Catalog Utility
 
 A CLI tool for fetching and querying satellite catalog data (TLE and SATCAT) from spacebook.com.
 
@@ -56,6 +56,22 @@ icu get --name "ISS (ZARYA)"
 
 ```bash
 icu get --norad 25544 --verbose
+```
+
+### Search for satellites
+
+```bash
+# Search by partial name
+icu search --name "starlink"
+
+# Search with filters
+icu search --name "ISS" --type "payload"
+
+# Limit results
+icu search --name "starlink" --limit 100
+
+# Show detailed results
+icu search --name "starlink" --verbose
 ```
 
 ### View catalog statistics
