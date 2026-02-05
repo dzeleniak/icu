@@ -36,10 +36,12 @@ icu fetch
 ### Get satellite by NORAD ID
 
 ```bash
+icu get 25544
+# or
 icu get --norad 25544
 ```
 
-Output (3-line TLE format):
+Default output (3-line TLE format):
 ```
 0 ISS (ZARYA)
 1 25544U 98067A   26036.24398336  .00012313  00000-0  23569-3 0  9993
@@ -52,10 +54,36 @@ Output (3-line TLE format):
 icu get --name "ISS (ZARYA)"
 ```
 
-### Verbose output
+### Composable output flags
+
+The get command supports composable flags to show exactly what you need:
 
 ```bash
-icu get --norad 25544 --verbose
+# Show only TLE (default)
+icu get 25544
+
+# Show only current position
+icu get 25544 --position
+
+# Show only metadata
+icu get 25544 --data
+
+# Combine flags to show multiple sections
+icu get 25544 --tle --position
+icu get 25544 --position --data
+icu get 25544 --tle --position --data
+
+# Verbose is shorthand for all three
+icu get 25544 --verbose
+```
+
+### Follow mode - continuous position updates
+
+Track a satellite's position in real-time with 1-second updates:
+
+```bash
+icu get 25544 --follow
+# Press Ctrl+C to exit
 ```
 
 ### Search for satellites
