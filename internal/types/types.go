@@ -1,11 +1,38 @@
 package types
 
-import "time"
+import (
+	"strconv"
+	"strings"
+	"time"
+)
 
 // TLE represents a Two-Line Element set entry (two lines of text)
 type TLE struct {
 	Line1 string `json:"line1"`
 	Line2 string `json:"line2"`
+}
+
+// GetNoradID extracts the NORAD catalog number from the TLE
+func (t *TLE) GetNoradID() int {
+	// NORAD catalog number is in columns 3-7 of line 1 (after "1 ")
+	if len(t.Line1) < 7 {
+		return 0
+	}
+
+	// Extract the catalog number (typically "1 00005U" -> "00005")
+	parts := strings.Fields(t.Line1)
+	if len(parts) < 2 {
+		return 0
+	}
+
+	// Remove trailing 'U' or 'C' classification
+	numStr := strings.TrimRight(parts[1], "UC")
+	noradID, err := strconv.Atoi(numStr)
+	if err != nil {
+		return 0
+	}
+
+	return noradID
 }
 
 // SATCAT represents a Satellite Catalog entry
@@ -31,4 +58,23 @@ type Catalog struct {
 	TLEs      []TLE     `json:"tles"`
 	SATCATs   []SATCAT  `json:"satcats"`
 	FetchedAt time.Time `json:"fetched_at"`
+}
+
+// Satellite represents a merged view of TLE and SATCAT data
+type Satellite struct {
+	NoradID     int
+	Name        string
+	IntlID      string
+	ObjectType  string
+	Owner       string
+	LaunchDate  string
+	DecayDate   string
+	LaunchSite  string
+	Period      float64
+	Inclination float64
+	Apogee      float64
+	Perigee     float64
+	RCSSize     string
+	TLE         *TLE
+	SATCAT      *SATCAT
 }

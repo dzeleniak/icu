@@ -15,9 +15,9 @@ var (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "icu",
-	Short: "ICU - International Catalog Utility for satellite data",
+	Short: "ICU - Internal Catalog Utility for satellite data",
 	Long: `ICU is a CLI tool for fetching and managing satellite catalog data
-from spacebook.com, including TLE (Two-Line Element) and SATCAT
+, including TLE (Two-Line Element) and SATCAT
 (Satellite Catalog) information.`,
 	// Default behavior: show stats
 	Run: func(cmd *cobra.Command, args []string) {
