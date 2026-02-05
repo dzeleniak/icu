@@ -33,7 +33,7 @@ func init() {
 	searchCmd.Flags().StringVarP(&searchName, "name", "n", "", "Search by satellite name (partial match, case-insensitive)")
 	searchCmd.Flags().StringVarP(&searchOwner, "owner", "o", "", "Filter by owner/country code")
 	searchCmd.Flags().StringVarP(&searchType, "type", "t", "", "Filter by object type (PAYLOAD, ROCKET BODY, DEBRIS)")
-	searchCmd.Flags().IntVarP(&searchLimit, "limit", "l", 50, "Maximum number of results to display")
+	searchCmd.Flags().IntVarP(&searchLimit, "limit", "l", 0, "Maximum number of results to display (0 = no limit)")
 	searchCmd.Flags().BoolVarP(&searchVerbose, "verbose", "v", false, "Display verbose satellite information")
 }
 
@@ -64,7 +64,7 @@ func runSearch() {
 
 	// Limit results
 	displayCount := len(results)
-	if displayCount > searchLimit {
+	if searchLimit > 0 && displayCount > searchLimit {
 		displayCount = searchLimit
 	}
 
@@ -116,7 +116,7 @@ func runSearch() {
 		}
 
 		fmt.Printf("Found %d satellites", len(results))
-		if len(results) > searchLimit {
+		if searchLimit > 0 && len(results) > searchLimit {
 			fmt.Printf(" (showing first %d)", searchLimit)
 		}
 		fmt.Println("\n")
@@ -124,13 +124,13 @@ func runSearch() {
 		// Display verbose output
 		displaySatellites(satellites)
 
-		if len(results) > searchLimit {
+		if searchLimit > 0 && len(results) > searchLimit {
 			fmt.Printf("\n... %d more results. Use --limit to show more.\n", len(results)-searchLimit)
 		}
 	} else {
 		// Display simple list
 		fmt.Printf("Found %d satellites", len(results))
-		if len(results) > searchLimit {
+		if searchLimit > 0 && len(results) > searchLimit {
 			fmt.Printf(" (showing first %d)", searchLimit)
 		}
 		fmt.Println("\n")
@@ -140,7 +140,7 @@ func runSearch() {
 			fmt.Printf("%-8d  %s\n", sat.NoradID, sat.Name)
 		}
 
-		if len(results) > searchLimit {
+		if searchLimit > 0 && len(results) > searchLimit {
 			fmt.Printf("\n... %d more results. Use --limit to show more.\n", len(results)-searchLimit)
 		}
 	}
