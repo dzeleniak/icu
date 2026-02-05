@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	"github.com/dzeleniak/icu/internal/storage"
@@ -78,7 +79,7 @@ func runSearch() {
 		}
 		fmt.Println("\n")
 
-		displaySatellites(results[:displayCount])
+		displaySatellitesVerbose(results[:displayCount])
 
 		if searchLimit > 0 && len(results) > searchLimit {
 			fmt.Printf("\n... %d more results. Use --limit to show more.\n", len(results)-searchLimit)
@@ -133,6 +134,11 @@ func searchSatellites(satellites []*types.Satellite, name, owner, objType, regim
 
 		results = append(results, sat)
 	}
+
+	// Sort results by NORAD ID
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].NoradID < results[j].NoradID
+	})
 
 	return results
 }

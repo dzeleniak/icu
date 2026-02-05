@@ -1,6 +1,6 @@
 # ICU - Internal Catalog Utility
 
-A CLI tool for fetching and querying satellite catalog data (TLE and SATCAT) from spacebook.com.
+A CLI tool for querying a satellite catalog.
 
 ## Installation
 

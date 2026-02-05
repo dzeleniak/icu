@@ -3,27 +3,32 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/dzeleniak/icu/internal/propagate"
 	"github.com/dzeleniak/icu/internal/storage"
 	"github.com/dzeleniak/icu/internal/types"
 	"github.com/spf13/cobra"
 )
 
 var (
-	noradID int
-	satName string
-	verbose bool
+	noradID  int
+	satName  string
+	verbose  bool
+	position bool
 )
 
 var getCmd = &cobra.Command{
-	Use:   "get",
+	Use:   "get [NORAD_ID]",
 	Short: "Get satellite information by NORAD ID or name",
-	Long: `Retrieve and display merged TLE and SATCAT information for satellites.
-You can filter by NORAD ID or satellite name. The command will display
-all matching satellites with their orbital parameters and catalog data.`,
+	Long: `Retrieve and display satellite TLE, current position, and catalog information.
+Provide a NORAD ID as a positional argument, or use --name to search by satellite name.
+The default view shows TLE, current position (if observer is configured), and metadata.`,
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		runGet()
+		runGet(args)
 	},
 }
 
@@ -31,10 +36,20 @@ func init() {
 	rootCmd.AddCommand(getCmd)
 	getCmd.Flags().IntVarP(&noradID, "norad", "n", 0, "Filter by NORAD catalog number")
 	getCmd.Flags().StringVarP(&satName, "name", "m", "", "Filter by satellite name (case-insensitive, exact match)")
+	getCmd.Flags().BoolVarP(&position, "position", "p", false, "Display TLE and current position")
 	getCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Display verbose satellite information")
 }
 
-func runGet() {
+func runGet(args []string) {
+	// Parse positional argument for NORAD ID if provided
+	if len(args) > 0 && noradID == 0 && satName == "" {
+		id, err := strconv.Atoi(args[0])
+		if err != nil {
+			log.Fatalf("Invalid NORAD ID: %s", args[0])
+		}
+		noradID = id
+	}
+
 	// Load catalog
 	store, err := storage.NewStorage(config.DataDir)
 	if err != nil {
@@ -61,9 +76,11 @@ func runGet() {
 
 	// Display results
 	if verbose {
-		displaySatellites(filtered)
+		displaySatellitesVerbose(filtered)
+	} else if position {
+		displaySatellitesWithPosition(filtered)
 	} else {
-		displayTLEWithName(filtered)
+		displaySatellitesDefault(filtered)
 	}
 }
 
@@ -93,8 +110,8 @@ func filterSatellites(satellites []*types.Satellite, noradID int, name string) [
 	return filtered
 }
 
-// displayTLEWithName outputs TLE with line 0 (name) for satellites that have TLE data
-func displayTLEWithName(satellites []*types.Satellite) {
+// displaySatellitesDefault shows just the 3-line TLE format
+func displaySatellitesDefault(satellites []*types.Satellite) {
 	for _, sat := range satellites {
 		if sat.TLE != nil {
 			fmt.Printf("0 %s\n", sat.Name)
@@ -104,39 +121,137 @@ func displayTLEWithName(satellites []*types.Satellite) {
 	}
 }
 
-// displaySatellites formats and displays satellite information
-func displaySatellites(satellites []*types.Satellite) {
+// displaySatellitesWithPosition shows TLE and current position
+func displaySatellitesWithPosition(satellites []*types.Satellite) {
+	// Check if observer is configured
+	observerConfigured := config.ObserverLatitude != 0.0 || config.ObserverLongitude != 0.0
+	var observer *propagate.ObserverPosition
+	if observerConfigured {
+		observer = &propagate.ObserverPosition{
+			Latitude:  config.ObserverLatitude,
+			Longitude: config.ObserverLongitude,
+			Altitude:  config.ObserverAltitude,
+		}
+	}
+
+	now := time.Now()
+
 	for i, sat := range satellites {
 		if i > 0 {
-			fmt.Println("\n" + strings.Repeat("-", 60))
+			fmt.Println()
 		}
 
+		// TLE at the top
+		if sat.TLE != nil {
+			fmt.Printf("0 %s\n", sat.Name)
+			fmt.Println(sat.TLE.Line1)
+			fmt.Println(sat.TLE.Line2)
+			fmt.Println()
+		}
+
+		// Current position if observer is configured
+		if observerConfigured && sat.TLE != nil {
+			pos, err := propagate.PropagateSatellite(sat.TLE, now)
+			if err == nil {
+				angles := propagate.CalculateObservationAngles(pos, observer)
+				fmt.Printf("Current Position (as of %s):\n", now.Format("2006-01-02 15:04:05 MST"))
+				fmt.Printf("  Elevation:    %7.2f°\n", angles.Elevation)
+				fmt.Printf("  Azimuth:      %7.2f°\n", angles.Azimuth)
+				fmt.Printf("  Range:        %10.0f km\n", angles.Range)
+				fmt.Printf("  Range Rate:   %8.2f km/s\n", angles.RangeRate)
+			}
+		} else if !observerConfigured {
+			fmt.Println("Observer location not configured. Set observer_latitude, observer_longitude, and observer_altitude in config.")
+		}
+	}
+}
+
+// displaySatellitesVerbose shows TLE, current position, and all metadata
+func displaySatellitesVerbose(satellites []*types.Satellite) {
+	// Check if observer is configured
+	observerConfigured := config.ObserverLatitude != 0.0 || config.ObserverLongitude != 0.0
+	var observer *propagate.ObserverPosition
+	if observerConfigured {
+		observer = &propagate.ObserverPosition{
+			Latitude:  config.ObserverLatitude,
+			Longitude: config.ObserverLongitude,
+			Altitude:  config.ObserverAltitude,
+		}
+	}
+
+	now := time.Now()
+
+	for i, sat := range satellites {
+		if i > 0 {
+			fmt.Println("\n" + strings.Repeat("=", 70))
+			fmt.Println()
+		}
+
+		// TLE at the top
+		if sat.TLE != nil {
+			fmt.Printf("0 %s\n", sat.Name)
+			fmt.Println(sat.TLE.Line1)
+			fmt.Println(sat.TLE.Line2)
+			fmt.Println()
+		}
+
+		// Current position if observer is configured
+		if observerConfigured && sat.TLE != nil {
+			pos, err := propagate.PropagateSatellite(sat.TLE, now)
+			if err == nil {
+				angles := propagate.CalculateObservationAngles(pos, observer)
+				fmt.Printf("Current Position (as of %s):\n", now.Format("2006-01-02 15:04:05 MST"))
+				fmt.Printf("  Elevation:    %7.2f°\n", angles.Elevation)
+				fmt.Printf("  Azimuth:      %7.2f°\n", angles.Azimuth)
+				fmt.Printf("  Range:        %10.0f km\n", angles.Range)
+				fmt.Printf("  Range Rate:   %8.2f km/s\n", angles.RangeRate)
+				fmt.Println()
+			}
+		}
+
+		// Satellite metadata
 		fmt.Printf("Name:           %s\n", sat.Name)
 		fmt.Printf("NORAD ID:       %d\n", sat.NoradID)
-		fmt.Printf("International:  %s\n", sat.IntlID)
-		fmt.Printf("Type:           %s\n", sat.ObjectType)
-		fmt.Printf("Owner:          %s\n", sat.Owner)
-		fmt.Printf("Orbit Regime:   %s\n", sat.OrbitRegime)
-		fmt.Printf("Launch Date:    %s\n", sat.LaunchDate)
-
+		if sat.IntlID != "" {
+			fmt.Printf("International:  %s\n", sat.IntlID)
+		}
+		if sat.ObjectType != "" {
+			fmt.Printf("Type:           %s\n", sat.ObjectType)
+		}
+		if sat.Owner != "" {
+			fmt.Printf("Owner:          %s\n", sat.Owner)
+		}
+		if sat.OrbitRegime != "" {
+			fmt.Printf("Orbit Regime:   %s\n", sat.OrbitRegime)
+		}
+		if sat.LaunchDate != "" {
+			fmt.Printf("Launch Date:    %s\n", sat.LaunchDate)
+		}
 		if sat.DecayDate != "" {
 			fmt.Printf("Decay Date:     %s\n", sat.DecayDate)
 		}
+		if sat.LaunchSite != "" {
+			fmt.Printf("Launch Site:    %s\n", sat.LaunchSite)
+		}
 
-		fmt.Printf("Launch Site:    %s\n", sat.LaunchSite)
-		fmt.Printf("\nOrbital Parameters:\n")
-		fmt.Printf("  Period:       %.2f minutes\n", sat.Period)
-		fmt.Printf("  Inclination:  %.2f°\n", sat.Inclination)
-		fmt.Printf("  Apogee:       %.0f km\n", sat.Apogee)
-		fmt.Printf("  Perigee:      %.0f km\n", sat.Perigee)
-		fmt.Printf("  RCS Size:     %s\n", sat.RCSSize)
-
-		if sat.TLE != nil {
-			fmt.Printf("\nTLE:\n")
-			fmt.Printf("  %s\n", sat.TLE.Line1)
-			fmt.Printf("  %s\n", sat.TLE.Line2)
-		} else {
-			fmt.Printf("\nTLE:            Not available\n")
+		// Orbital parameters
+		if sat.Period > 0 || sat.Inclination > 0 || sat.Apogee > 0 || sat.Perigee > 0 {
+			fmt.Printf("\nOrbital Parameters:\n")
+			if sat.Period > 0 {
+				fmt.Printf("  Period:       %.2f minutes\n", sat.Period)
+			}
+			if sat.Inclination > 0 {
+				fmt.Printf("  Inclination:  %.2f°\n", sat.Inclination)
+			}
+			if sat.Apogee > 0 {
+				fmt.Printf("  Apogee:       %.0f km\n", sat.Apogee)
+			}
+			if sat.Perigee > 0 {
+				fmt.Printf("  Perigee:      %.0f km\n", sat.Perigee)
+			}
+			if sat.RCSSize != "" {
+				fmt.Printf("  RCS Size:     %s\n", sat.RCSSize)
+			}
 		}
 	}
 }
