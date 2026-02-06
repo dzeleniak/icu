@@ -4,6 +4,7 @@
   # ICU - Internal Catalog Utility
 
 </div>
+
 ## Installation
 
 Build the binary:
