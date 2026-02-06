@@ -10,9 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dzeleniak/icu/internal/propagate"
-	"github.com/dzeleniak/icu/internal/storage"
-	"github.com/dzeleniak/icu/internal/types"
+	"github.com/dzeleniak/icu/pkg/satellite"
 	"github.com/spf13/cobra"
 )
 
@@ -60,7 +58,7 @@ func runGet(args []string) {
 	}
 
 	// Load catalog
-	store, err := storage.NewStorage(config.DataDir)
+	store, err := satellite.NewStorage(config.DataDir)
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
@@ -75,8 +73,8 @@ func runGet(args []string) {
 		return
 	}
 
-	// Filter satellites
-	filtered := filterSatellites(catalog.Satellites, noradID, satName)
+	// Filter satellites using library function
+	filtered := satellite.FilterSatellites(catalog.Satellites, noradID, satName)
 
 	if len(filtered) == 0 {
 		fmt.Println("No satellites found matching the criteria.")
@@ -100,39 +98,13 @@ func runGet(args []string) {
 	}
 }
 
-// filterSatellites filters satellites based on NORAD ID and/or name
-func filterSatellites(satellites []*types.Satellite, noradID int, name string) []*types.Satellite {
-	if noradID == 0 && name == "" {
-		return satellites
-	}
-
-	filtered := make([]*types.Satellite, 0)
-	nameLower := strings.ToLower(name)
-
-	for _, sat := range satellites {
-		// Filter by NORAD ID if specified
-		if noradID > 0 && sat.NoradID != noradID {
-			continue
-		}
-
-		// Filter by name if specified (exact match, case-insensitive)
-		if name != "" && strings.ToLower(sat.Name) != nameLower {
-			continue
-		}
-
-		filtered = append(filtered, sat)
-	}
-
-	return filtered
-}
-
 // displaySatellitesComposed shows only the requested components based on flags
-func displaySatellitesComposed(satellites []*types.Satellite, showTLE, showPos, showData bool) {
+func displaySatellitesComposed(satellites []*satellite.Satellite, showTLE, showPos, showData bool) {
 	// Check if observer is configured for position display
 	observerConfigured := config.ObserverLatitude != 0.0 || config.ObserverLongitude != 0.0
-	var observer *propagate.ObserverPosition
+	var observer *satellite.ObserverPosition
 	if showPos && observerConfigured {
-		observer = &propagate.ObserverPosition{
+		observer = &satellite.ObserverPosition{
 			Latitude:  config.ObserverLatitude,
 			Longitude: config.ObserverLongitude,
 			Altitude:  config.ObserverAltitude,
@@ -161,9 +133,9 @@ func displaySatellitesComposed(satellites []*types.Satellite, showTLE, showPos, 
 			if !observerConfigured {
 				fmt.Println("Observer location not configured. Set observer_latitude, observer_longitude, and observer_altitude in config.")
 			} else if sat.TLE != nil {
-				pos, err := propagate.PropagateSatellite(sat.TLE, now)
+				pos, err := satellite.PropagateSatellite(sat.TLE, now)
 				if err == nil {
-					angles := propagate.CalculateObservationAngles(pos, observer)
+					angles := satellite.CalculateObservationAngles(pos, observer)
 					fmt.Printf("Current Position (as of %s):\n", now.Format("2006-01-02 15:04:05 MST"))
 					fmt.Printf("  Elevation:    %7.2f°\n", angles.Elevation)
 					fmt.Printf("  Azimuth:      %7.2f°\n", angles.Azimuth)
@@ -226,7 +198,7 @@ func displaySatellitesComposed(satellites []*types.Satellite, showTLE, showPos, 
 }
 
 // displaySatellitesFollow continuously updates position every second
-func displaySatellitesFollow(satellites []*types.Satellite) {
+func displaySatellitesFollow(satellites []*satellite.Satellite) {
 	// Only support single satellite for follow mode
 	if len(satellites) > 1 {
 		fmt.Println("Follow mode only supports a single satellite. Please specify one satellite.")
@@ -249,7 +221,7 @@ func displaySatellitesFollow(satellites []*types.Satellite) {
 		return
 	}
 
-	observer := &propagate.ObserverPosition{
+	observer := &satellite.ObserverPosition{
 		Latitude:  config.ObserverLatitude,
 		Longitude: config.ObserverLongitude,
 		Altitude:  config.ObserverAltitude,
@@ -290,15 +262,15 @@ func displaySatellitesFollow(satellites []*types.Satellite) {
 }
 
 // displayCurrentPosition shows the current position for a single satellite
-func displayCurrentPosition(sat *types.Satellite, observer *propagate.ObserverPosition) {
+func displayCurrentPosition(sat *satellite.Satellite, observer *satellite.ObserverPosition) {
 	now := time.Now()
-	pos, err := propagate.PropagateSatellite(sat.TLE, now)
+	pos, err := satellite.PropagateSatellite(sat.TLE, now)
 	if err != nil {
 		fmt.Printf("Error propagating satellite: %v\n", err)
 		return
 	}
 
-	angles := propagate.CalculateObservationAngles(pos, observer)
+	angles := satellite.CalculateObservationAngles(pos, observer)
 	fmt.Printf("Current Position (as of %s):\r\n", now.Format("2006-01-02 15:04:05 MST"))
 	fmt.Printf("  Elevation:    %7.2f°%s\r\n", angles.Elevation, strings.Repeat(" ", 20))
 	fmt.Printf("  Azimuth:      %7.2f°%s\r\n", angles.Azimuth, strings.Repeat(" ", 20))
@@ -308,12 +280,12 @@ func displayCurrentPosition(sat *types.Satellite, observer *propagate.ObserverPo
 }
 
 // displaySatellitesVerbose shows TLE, current position, and all metadata
-func displaySatellitesVerbose(satellites []*types.Satellite) {
+func displaySatellitesVerbose(satellites []*satellite.Satellite) {
 	// Check if observer is configured
 	observerConfigured := config.ObserverLatitude != 0.0 || config.ObserverLongitude != 0.0
-	var observer *propagate.ObserverPosition
+	var observer *satellite.ObserverPosition
 	if observerConfigured {
-		observer = &propagate.ObserverPosition{
+		observer = &satellite.ObserverPosition{
 			Latitude:  config.ObserverLatitude,
 			Longitude: config.ObserverLongitude,
 			Altitude:  config.ObserverAltitude,
@@ -338,9 +310,9 @@ func displaySatellitesVerbose(satellites []*types.Satellite) {
 
 		// Current position if observer is configured
 		if observerConfigured && sat.TLE != nil {
-			pos, err := propagate.PropagateSatellite(sat.TLE, now)
+			pos, err := satellite.PropagateSatellite(sat.TLE, now)
 			if err == nil {
-				angles := propagate.CalculateObservationAngles(pos, observer)
+				angles := satellite.CalculateObservationAngles(pos, observer)
 				fmt.Printf("Current Position (as of %s):\n", now.Format("2006-01-02 15:04:05 MST"))
 				fmt.Printf("  Elevation:    %7.2f°\n", angles.Elevation)
 				fmt.Printf("  Azimuth:      %7.2f°\n", angles.Azimuth)

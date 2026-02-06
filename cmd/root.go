@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dzeleniak/icu/pkg/satellite"
 	"github.com/spf13/cobra"
 )
 
 var (
 	cfgFile string
-	config  *Config
+	config  *satellite.Config
 )
 
 // rootCmd represents the base command when called without any subcommands

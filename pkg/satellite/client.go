@@ -1,4 +1,4 @@
-package client
+package satellite
 
 import (
 	"bufio"
@@ -9,15 +9,13 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/dzeleniak/icu/internal/types"
 )
 
 // Client handles API requests to spacebook.com
 type Client struct {
-	httpClient     *http.Client
-	tleURL         string
-	satcatURL      string
+	httpClient *http.Client
+	tleURL     string
+	satcatURL  string
 }
 
 // NewClient creates a new API client with a configured HTTP client
@@ -31,9 +29,9 @@ func NewClient(tleURL, satcatURL string, timeout time.Duration) *Client {
 	}
 }
 
-// FetchTLEs retrieves all TLE entries from the API
-// TLEs are returned as plain text with two lines per entry
-func (c *Client) FetchTLEs() ([]types.TLE, error) {
+// FetchTLEs retrieves all TLE entries from the API.
+// TLEs are returned as plain text with two lines per entry.
+func (c *Client) FetchTLEs() ([]TLE, error) {
 	resp, err := c.httpClient.Get(c.tleURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch TLEs: %w", err)
@@ -50,7 +48,7 @@ func (c *Client) FetchTLEs() ([]types.TLE, error) {
 	}
 
 	// Parse TLE data (each TLE is 2 lines)
-	var tles []types.TLE
+	var tles []TLE
 	scanner := bufio.NewScanner(bytes.NewReader(body))
 	var line1 string
 	lineNum := 0
@@ -64,7 +62,7 @@ func (c *Client) FetchTLEs() ([]types.TLE, error) {
 		if lineNum%2 == 0 {
 			line1 = line
 		} else {
-			tles = append(tles, types.TLE{
+			tles = append(tles, TLE{
 				Line1: line1,
 				Line2: line,
 			})
@@ -79,9 +77,9 @@ func (c *Client) FetchTLEs() ([]types.TLE, error) {
 	return tles, nil
 }
 
-// FetchSATCATs retrieves all SATCAT entries from the API
-// SATCAT data is returned as JSON
-func (c *Client) FetchSATCATs() ([]types.SATCAT, error) {
+// FetchSATCATs retrieves all SATCAT entries from the API.
+// SATCAT data is returned as JSON.
+func (c *Client) FetchSATCATs() ([]SATCAT, error) {
 	resp, err := c.httpClient.Get(c.satcatURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch SATCATs: %w", err)
@@ -97,7 +95,7 @@ func (c *Client) FetchSATCATs() ([]types.SATCAT, error) {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	var satcats []types.SATCAT
+	var satcats []SATCAT
 	if err := json.Unmarshal(body, &satcats); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal SATCAT response: %w", err)
 	}

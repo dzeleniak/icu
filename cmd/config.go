@@ -4,27 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
-	"github.com/dzeleniak/icu/internal/types"
+	"github.com/dzeleniak/icu/pkg/satellite"
 	"github.com/spf13/viper"
 )
 
-// Config represents the application configuration
-type Config struct {
-	DataDir           string  `mapstructure:"data_dir"`
-	AutoFetch         bool    `mapstructure:"auto_fetch"`
-	APITimeout        int     `mapstructure:"api_timeout"`
-	MaxCatalogAge     int     `mapstructure:"max_catalog_age"` // in hours, 0 = no auto-refresh
-	TLEEndpoint       string  `mapstructure:"tle_endpoint"`
-	SATCATEndpoint    string  `mapstructure:"satcat_endpoint"`
-	ObserverLatitude  float64 `mapstructure:"observer_latitude"`  // in degrees
-	ObserverLongitude float64 `mapstructure:"observer_longitude"` // in degrees
-	ObserverAltitude  float64 `mapstructure:"observer_altitude"`  // in meters above sea level
-}
-
-// InitConfig initializes the configuration using Viper
-func InitConfig() (*Config, error) {
+// InitConfig initializes the configuration using Viper and returns a satellite.Config.
+// This function handles CLI-specific configuration loading from files.
+func InitConfig() (*satellite.Config, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
@@ -40,16 +27,19 @@ func InitConfig() (*Config, error) {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(configDir)
 
-	// Set defaults
+	// Get defaults from library
+	defaults := satellite.DefaultConfig()
+
+	// Set Viper defaults
 	viper.SetDefault("data_dir", configDir)
-	viper.SetDefault("auto_fetch", true)
-	viper.SetDefault("api_timeout", 30)
-	viper.SetDefault("max_catalog_age", 24) // 24 hours default
-	viper.SetDefault("tle_endpoint", "https://spacebook.com/api/entity/tle")
-	viper.SetDefault("satcat_endpoint", "https://spacebook.com/api/entity/satcat")
-	viper.SetDefault("observer_latitude", 0.0)   // degrees
-	viper.SetDefault("observer_longitude", 0.0)  // degrees
-	viper.SetDefault("observer_altitude", 0.0)   // meters
+	viper.SetDefault("auto_fetch", defaults.AutoFetch)
+	viper.SetDefault("api_timeout", defaults.APITimeout)
+	viper.SetDefault("max_catalog_age", defaults.MaxCatalogAge)
+	viper.SetDefault("tle_endpoint", defaults.TLEEndpoint)
+	viper.SetDefault("satcat_endpoint", defaults.SATCATEndpoint)
+	viper.SetDefault("observer_latitude", defaults.ObserverLatitude)
+	viper.SetDefault("observer_longitude", defaults.ObserverLongitude)
+	viper.SetDefault("observer_altitude", defaults.ObserverAltitude)
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {
@@ -64,29 +54,10 @@ func InitConfig() (*Config, error) {
 		}
 	}
 
-	var cfg Config
+	var cfg satellite.Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	return &cfg, nil
-}
-
-// IsCatalogStale checks if the catalog is older than the configured max age
-// Returns true if the catalog should be refreshed, false otherwise
-func (c *Config) IsCatalogStale(catalog *types.Catalog) bool {
-	// If max_catalog_age is 0, never auto-refresh
-	if c.MaxCatalogAge == 0 {
-		return false
-	}
-
-	// If catalog is nil, it's considered stale
-	if catalog == nil {
-		return true
-	}
-
-	maxAge := time.Duration(c.MaxCatalogAge) * time.Hour
-	age := time.Since(catalog.FetchedAt)
-
-	return age > maxAge
 }

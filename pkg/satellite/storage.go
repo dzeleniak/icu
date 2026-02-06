@@ -1,12 +1,10 @@
-package storage
+package satellite
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/dzeleniak/icu/internal/types"
 )
 
 // Storage handles persistence of catalog data
@@ -31,7 +29,7 @@ func (s *Storage) catalogPath() string {
 }
 
 // Save persists the catalog to disk
-func (s *Storage) Save(catalog *types.Catalog) error {
+func (s *Storage) Save(catalog *Catalog) error {
 	data, err := json.MarshalIndent(catalog, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal catalog: %w", err)
@@ -45,7 +43,7 @@ func (s *Storage) Save(catalog *types.Catalog) error {
 }
 
 // Load reads the catalog from disk
-func (s *Storage) Load() (*types.Catalog, error) {
+func (s *Storage) Load() (*Catalog, error) {
 	data, err := os.ReadFile(s.catalogPath())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -54,7 +52,7 @@ func (s *Storage) Load() (*types.Catalog, error) {
 		return nil, fmt.Errorf("failed to read catalog file: %w", err)
 	}
 
-	var catalog types.Catalog
+	var catalog Catalog
 	if err := json.Unmarshal(data, &catalog); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal catalog: %w", err)
 	}

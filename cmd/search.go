@@ -3,11 +3,8 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"sort"
-	"strings"
 
-	"github.com/dzeleniak/icu/internal/storage"
-	"github.com/dzeleniak/icu/internal/types"
+	"github.com/dzeleniak/icu/pkg/satellite"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +39,7 @@ func init() {
 
 func runSearch() {
 	// Load catalog
-	store, err := storage.NewStorage(config.DataDir)
+	store, err := satellite.NewStorage(config.DataDir)
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
@@ -57,8 +54,13 @@ func runSearch() {
 		return
 	}
 
-	// Search satellites
-	results := searchSatellites(catalog.Satellites, searchName, searchOwner, searchType, searchRegime)
+	// Search satellites using library function
+	results := satellite.SearchSatellites(catalog.Satellites, satellite.SearchCriteria{
+		Name:   searchName,
+		Owner:  searchOwner,
+		Type:   searchType,
+		Regime: searchRegime,
+	})
 
 	if len(results) == 0 {
 		fmt.Println("No satellites found matching the criteria.")
@@ -103,42 +105,3 @@ func runSearch() {
 	}
 }
 
-func searchSatellites(satellites []*types.Satellite, name, owner, objType, regime string) []*types.Satellite {
-	results := make([]*types.Satellite, 0)
-
-	nameLower := strings.ToLower(name)
-	ownerUpper := strings.ToUpper(owner)
-	typeLower := strings.ToLower(objType)
-	regimeUpper := strings.ToUpper(regime)
-
-	for _, sat := range satellites {
-		// Filter by name (partial match)
-		if name != "" && !strings.Contains(strings.ToLower(sat.Name), nameLower) {
-			continue
-		}
-
-		// Filter by owner (partial match)
-		if owner != "" && !strings.Contains(strings.ToUpper(sat.Owner), ownerUpper) {
-			continue
-		}
-
-		// Filter by type (partial match)
-		if objType != "" && !strings.Contains(strings.ToLower(sat.ObjectType), typeLower) {
-			continue
-		}
-
-		// Filter by orbital regime
-		if regime != "" && strings.ToUpper(sat.OrbitRegime) != regimeUpper {
-			continue
-		}
-
-		results = append(results, sat)
-	}
-
-	// Sort results by NORAD ID
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].NoradID < results[j].NoradID
-	})
-
-	return results
-}

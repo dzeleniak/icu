@@ -1,4 +1,7 @@
-package types
+// Package satellite provides satellite catalog data structures and operations.
+// It includes TLE (Two-Line Element) parsing, SATCAT (Satellite Catalog) data handling,
+// orbital propagation using SGP4, and satellite search/filtering capabilities.
+package satellite
 
 import (
 	"strconv"

@@ -1,11 +1,10 @@
-package propagate
+package satellite
 
 import (
 	"fmt"
 	"math"
 	"time"
 
-	"github.com/dzeleniak/icu/internal/types"
 	"github.com/joshuaferrara/go-satellite"
 )
 
@@ -29,8 +28,8 @@ type ObserverPosition struct {
 
 // SatellitePosition represents a satellite's position at a specific time
 type SatellitePosition struct {
-	Time      time.Time
-	X, Y, Z   float64 // ECEF coordinates in km
+	Time       time.Time
+	X, Y, Z    float64 // ECEF coordinates in km
 	Vx, Vy, Vz float64 // ECEF velocity in km/s
 }
 
@@ -43,9 +42,9 @@ type ObservationAngles struct {
 	RangeRate float64 // km/s
 }
 
-// PropagateSatellite propagates a satellite's position using SGP4
-// Returns the satellite's ECEF position at the given time
-func PropagateSatellite(tle *types.TLE, t time.Time) (*SatellitePosition, error) {
+// PropagateSatellite propagates a satellite's position using SGP4.
+// Returns the satellite's ECEF position at the given time.
+func PropagateSatellite(tle *TLE, t time.Time) (*SatellitePosition, error) {
 	if tle == nil {
 		return nil, fmt.Errorf("TLE is nil")
 	}
@@ -76,9 +75,9 @@ func PropagateSatellite(tle *types.TLE, t time.Time) (*SatellitePosition, error)
 	}, nil
 }
 
-// PropagateRange propagates a satellite over a time range with a given step size
-// Returns a slice of satellite positions
-func PropagateRange(tle *types.TLE, startTime, endTime time.Time, stepSize time.Duration) ([]*SatellitePosition, error) {
+// PropagateRange propagates a satellite over a time range with a given step size.
+// Returns a slice of satellite positions.
+func PropagateRange(tle *TLE, startTime, endTime time.Time, stepSize time.Duration) ([]*SatellitePosition, error) {
 	if tle == nil {
 		return nil, fmt.Errorf("TLE is nil")
 	}
@@ -111,9 +110,9 @@ func ECEFToTopocentric(satPos *SatellitePosition, observer *ObserverPosition) (e
 	// For observer position in ECEF, use geodetic to ECEF conversion
 	// Using WGS84 constants
 	const (
-		a  = 6378.137     // Earth semi-major axis in km
+		a  = 6378.137            // Earth semi-major axis in km
 		f  = 1.0 / 298.257223563 // Earth flattening
-		e2 = 2*f - f*f    // First eccentricity squared
+		e2 = 2*f - f*f           // First eccentricity squared
 	)
 
 	sinLat := math.Sin(obsLatRad)
@@ -141,7 +140,7 @@ func ECEFToTopocentric(satPos *SatellitePosition, observer *ObserverPosition) (e
 }
 
 // CalculateObservationAngles calculates azimuth, elevation, range, and range rate
-// for a satellite position relative to an observer
+// for a satellite position relative to an observer.
 func CalculateObservationAngles(satPos *SatellitePosition, observer *ObserverPosition) *ObservationAngles {
 	// Convert to topocentric coordinates
 	east, north, up := ECEFToTopocentric(satPos, observer)
@@ -186,8 +185,8 @@ func CalculateObservationAngles(satPos *SatellitePosition, observer *ObserverPos
 	}
 }
 
-// CalculateObservationAnglesRange calculates observation angles over a time range
-func CalculateObservationAnglesRange(tle *types.TLE, observer *ObserverPosition, startTime, endTime time.Time, stepSize time.Duration) ([]*ObservationAngles, error) {
+// CalculateObservationAnglesRange calculates observation angles over a time range.
+func CalculateObservationAnglesRange(tle *TLE, observer *ObserverPosition, startTime, endTime time.Time, stepSize time.Duration) ([]*ObservationAngles, error) {
 	positions, err := PropagateRange(tle, startTime, endTime, stepSize)
 	if err != nil {
 		return nil, err
@@ -201,14 +200,14 @@ func CalculateObservationAnglesRange(tle *types.TLE, observer *ObserverPosition,
 	return observations, nil
 }
 
-// IsVisible checks if a satellite is visible (above horizon) from the observer's position
+// IsVisible checks if a satellite is visible (above horizon) from the observer's position.
 func IsVisible(obs *ObservationAngles, minElevation float64) bool {
 	return obs.Elevation >= minElevation
 }
 
-// FindPasses finds visible passes of a satellite over a time range
-// A pass is defined as a continuous period where the satellite is above the minimum elevation
-func FindPasses(tle *types.TLE, observer *ObserverPosition, startTime, endTime time.Time, stepSize time.Duration, minElevation float64) ([][]*ObservationAngles, error) {
+// FindPasses finds visible passes of a satellite over a time range.
+// A pass is defined as a continuous period where the satellite is above the minimum elevation.
+func FindPasses(tle *TLE, observer *ObserverPosition, startTime, endTime time.Time, stepSize time.Duration, minElevation float64) ([][]*ObservationAngles, error) {
 	observations, err := CalculateObservationAnglesRange(tle, observer, startTime, endTime, stepSize)
 	if err != nil {
 		return nil, err
@@ -236,8 +235,8 @@ func FindPasses(tle *types.TLE, observer *ObserverPosition, startTime, endTime t
 	return passes, nil
 }
 
-// DetermineOrbitRegime classifies a satellite's orbital regime based on orbital parameters
-// Uses apogee, perigee (km), period (minutes), and inclination (degrees)
+// DetermineOrbitRegime classifies a satellite's orbital regime based on orbital parameters.
+// Uses apogee, perigee (km), period (minutes), and inclination (degrees).
 func DetermineOrbitRegime(apogee, perigee, period, inclination float64) OrbitRegime {
 	// Check for invalid/missing data
 	if apogee <= 0 || perigee <= 0 || period <= 0 {
@@ -260,9 +259,9 @@ func DetermineOrbitRegime(apogee, perigee, period, inclination float64) OrbitReg
 	// GEO: Geostationary orbit
 	// Period ~1436 minutes (23.93 hours), altitude ~35,786 km, low inclination
 	// Allow some tolerance for period and altitude
-	periodTolerance := 30.0  // minutes
-	altitudeTolerance := 500.0 // km
-	inclinationTolerance := 5.0 // degrees
+	periodTolerance := 30.0        // minutes
+	altitudeTolerance := 500.0     // km
+	inclinationTolerance := 5.0    // degrees
 
 	geoAltitude := 35786.0
 	geoPeriod := 1436.0

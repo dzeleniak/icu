@@ -3,13 +3,10 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"sort"
 	"strings"
 	"time"
 
-	"github.com/dzeleniak/icu/internal/propagate"
-	"github.com/dzeleniak/icu/internal/storage"
-	"github.com/dzeleniak/icu/internal/types"
+	"github.com/dzeleniak/icu/pkg/satellite"
 	"github.com/spf13/cobra"
 )
 
@@ -47,12 +44,6 @@ func init() {
 	visibleCmd.Flags().BoolVarP(&visibleVerbose, "verbose", "v", false, "Display verbose satellite information")
 }
 
-// VisibleSatellite holds a satellite and its current observation angles
-type VisibleSatellite struct {
-	Satellite *types.Satellite
-	Angles    *propagate.ObservationAngles
-}
-
 func runSearchVisible() {
 	// Check observer configuration
 	if config.ObserverLatitude == 0.0 && config.ObserverLongitude == 0.0 {
@@ -61,14 +52,14 @@ func runSearchVisible() {
 		return
 	}
 
-	observer := &propagate.ObserverPosition{
+	observer := &satellite.ObserverPosition{
 		Latitude:  config.ObserverLatitude,
 		Longitude: config.ObserverLongitude,
 		Altitude:  config.ObserverAltitude,
 	}
 
 	// Load catalog
-	store, err := storage.NewStorage(config.DataDir)
+	store, err := satellite.NewStorage(config.DataDir)
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
@@ -83,44 +74,27 @@ func runSearchVisible() {
 		return
 	}
 
-	// Apply search filters to narrow down candidates
-	candidates := searchSatellites(catalog.Satellites, visibleName, visibleOwner, visibleType, visibleRegime)
-
-	if len(candidates) == 0 {
-		fmt.Println("No satellites found matching the search criteria.")
-		return
-	}
-
-	fmt.Printf("Checking %d satellites for visibility...\n", len(candidates))
-
-	// Get current time
+	// Use library function to find visible satellites
+	fmt.Printf("Searching for visible satellites...\n")
 	now := time.Now()
 
-	// Check visibility for each candidate
-	visible := make([]*VisibleSatellite, 0)
-
-	for _, sat := range candidates {
-		if sat.TLE == nil {
-			continue // Skip satellites without TLE data
-		}
-
-		// Propagate satellite to current time
-		pos, err := propagate.PropagateSatellite(sat.TLE, now)
-		if err != nil {
-			// Skip satellites that fail to propagate
-			continue
-		}
-
-		// Calculate observation angles
-		angles := propagate.CalculateObservationAngles(pos, observer)
-
-		// Check if within elevation bounds
-		if angles.Elevation >= visibleMinElevation && angles.Elevation <= visibleMaxElevation {
-			visible = append(visible, &VisibleSatellite{
-				Satellite: sat,
-				Angles:    angles,
-			})
-		}
+	visible, err := satellite.FindVisibleSatellites(
+		catalog.Satellites,
+		observer,
+		now,
+		satellite.VisibilityCriteria{
+			SearchCriteria: satellite.SearchCriteria{
+				Name:   visibleName,
+				Owner:  visibleOwner,
+				Type:   visibleType,
+				Regime: visibleRegime,
+			},
+			MinElevation: visibleMinElevation,
+			MaxElevation: visibleMaxElevation,
+		},
+	)
+	if err != nil {
+		log.Fatalf("Error finding visible satellites: %v", err)
 	}
 
 	if len(visible) == 0 {
@@ -128,11 +102,6 @@ func runSearchVisible() {
 			visibleMinElevation, visibleMaxElevation)
 		return
 	}
-
-	// Sort by elevation (highest first)
-	sort.Slice(visible, func(i, j int) bool {
-		return visible[i].Angles.Elevation > visible[j].Angles.Elevation
-	})
 
 	// Limit results
 	displayCount := len(visible)
@@ -159,7 +128,7 @@ func runSearchVisible() {
 	}
 }
 
-func displayVisibleSatellitesList(visible []*VisibleSatellite) {
+func displayVisibleSatellitesList(visible []*satellite.VisibleSatellite) {
 	fmt.Printf("%-8s  %-40s  %-7s  %-7s  %-11s\n", "NORAD", "Name", "El (°)", "Az (°)", "Range (km)")
 	fmt.Println(strings.Repeat("-", 80))
 
@@ -173,7 +142,7 @@ func displayVisibleSatellitesList(visible []*VisibleSatellite) {
 	}
 }
 
-func displayVisibleSatellitesVerbose(visible []*VisibleSatellite) {
+func displayVisibleSatellitesVerbose(visible []*satellite.VisibleSatellite) {
 	for i, v := range visible {
 		if i > 0 {
 			fmt.Println("\n" + strings.Repeat("-", 60))

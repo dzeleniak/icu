@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/dzeleniak/icu/internal/storage"
+	"github.com/dzeleniak/icu/pkg/satellite"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +27,7 @@ func init() {
 
 func runStats() {
 	// Create storage
-	store, err := storage.NewStorage(config.DataDir)
+	store, err := satellite.NewStorage(config.DataDir)
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
