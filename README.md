@@ -1,7 +1,9 @@
-# ICU - Internal Catalog Utility
+<div align="center">
+  <img src=".github/assets/icu.png" alt="ICU Logo" width="200">
 
-A CLI tool for querying a satellite catalog.
+  # ICU - Internal Catalog Utility
 
+</div>
 ## Installation
 
 Build the binary:
